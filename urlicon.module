@@ -1,0 +1,106 @@
+<?php
+// $Id$
+
+// Define path
+define('UC_FILE_PATH', file_directory_path().'/urlicon');
+
+function urlicon_help($section) {
+  switch ($section) {
+    case 'admin/help#urlicon':
+      $output = '<p>'. t('The URLIcon module automatically adds a CSS class to &lt;a&gt;-elements reflecting their target and fetches the favicon from the target site.') .'</p>';
+      $output .= '<p>'. t('<p>Use Input Formats to enable the URL filter'). '</p>';
+      $output .= t('<ol><li>Select an existing Input Format or add a new one</li><li>Configure the Input Format</li><li>Enable URL class filter and Save configuration</li><li>Rearrange the weight of the URL filter depending on what filters exist in the format</li></ol>');
+      $output .= t('<p>You can enable the urlfilter for an input format from <a href="%admin-filters">administer &gt;&gt; Site Configuration &gt;&gt; Input Filter</a>.', array('%admin-filters' => url('admin/settings/filters')));
+      return $output;
+    case 'admin/modules#description':
+      return t('Automatically fetch favicons for URLs.');
+  }
+}
+
+function urlicon_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  switch ($op) {
+    case 'view':
+      if (file_exists(UC_FILE_PATH.'/nid_'.$node->nid.'.css')) drupal_add_css(UC_FILE_PATH.'/nid_'.$node->nid.'.css', 'module');
+      break;
+  }
+}
+
+function urlicon_filter($op, $delta = 0, $format = -1, $text = '') {
+  switch ($op) {
+    case 'list':
+      return array(0 => t('URLIcon filter'));
+    
+    case 'description':
+      return t('Adds favicons to URLs.');
+    
+    case 'process':
+      global $ui_style;
+      $ui_style = array();
+      
+      // check for directory
+      $dir = UC_FILE_PATH;
+      file_check_directory($dir, 1);
+      
+      $text = preg_replace_callback('/<a.+?href=\"(http:\/\/.+?)\"[^>]*>(.+?)<\/a>/i','urlicon_replace', $text);
+      
+      $nid = arg(1);
+      if (!empty($nid) AND count($ui_style) > 0) {
+        $ui_style = array_unique($ui_style);
+        foreach ($ui_style as $key => $value) {
+          $file .= $value."\n";
+        }
+        file_save_data($file, $dir.'/nid_'.check_plain(arg(1)).'.css', FILE_EXISTS_REPLACE);
+      }
+      
+      return $text;
+    
+    default:
+      return $text;
+  }
+}
+
+function urlicon_replace($match) {
+  global $ui_style;
+  
+  // Define acceptable Content-Types
+  // Added text for text/plain Content-Type as that was returned from a test of www.nytimes.com
+  // Added text for application/octet-stream Content-Type as that was returned from a test of www.sourceforge.net
+  $ui_ctype = array('image/x-icon', 'text/plain', 'application/octet-stream');
+  $dir = UC_FILE_PATH;
+  
+  $url = @parse_url($match[1]);
+  $domain = explode('.', $url['host']);
+  $domain = check_plain(str_replace('.', '_', $url['host']));
+
+  //check if favicon exists locally
+  if ($url['host'] AND !file_exists($dir.'/'.$domain.'.ico')) {
+  
+    //check for favicon on remote site
+    $data = drupal_http_request(check_plain('http://'.$url['host'].'/favicon.ico'));
+    drupal_set_message(print_r($data,1));
+    
+    // First verify if the favicon was returned
+    if (($data->code == '200' OR $data->redirect_code == '200') AND ($data->headers['Content-Length'] > 0 OR $data->headers['Content-length'] > 0)) {
+      
+      //check for acceptable Content-Type
+      if (in_array($data->headers['Content-Type'], $ui_ctype) OR in_array($data->headers['Content-type'], $ui_ctype)) {
+        //save favicon to file
+        file_save_data($data->data, $dir.'/'.$domain.'.ico', FILE_EXISTS_REPLACE);
+      }
+      
+    }
+    
+  }
+  
+  //add CSS stuff only if favicon is availlable
+  if (file_exists($dir.'/'.$domain.'.ico')) {
+    if (stristr($match[0], 'class')) {
+      $match[0] = str_replace('class="', 'class="ui-'.$domain.' ', $match[0]);
+    } else {
+      $match[0] = str_replace('">', '" class="ui-'.$domain.'">', $match[0]);
+    }
+    $ui_style[] = ".ui-".$domain." {background: url(".base_path().$dir."/".$domain.".ico) right no-repeat;padding-right:1.5em;}";
+  }
+  
+  return $match[0];
+}
