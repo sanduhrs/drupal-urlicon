@@ -1,6 +1,10 @@
 vCHANGELOG
 ---------
 
+urlicon.module - April, 8th 2007
+--------------------------------------
+- looks for favicon in metatags
+
 urlicon.module - October, 19th 2006
 --------------------------------------
 - Improved performance if favicon already availlable.
