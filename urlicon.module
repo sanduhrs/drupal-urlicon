@@ -149,7 +149,7 @@ function urlicon_replace($match) {
   }
   else {
     // if not availlable provide a default icon
-    $match[0] = str_replace('</a>', ' '. theme_urlicon(drupal_get_path('module', 'urlicon') .'/favicon.ico', t('favicon'), $url['host'], array('class' => 'urlicon ui-external')). '</a>', $match[0]);
+    $match[0] = str_replace('</a>', ' '. theme('urlicon', drupal_get_path('module', 'urlicon') .'/favicon.ico', t('favicon'), $url['host'], array('class' => 'urlicon ui-external')). '</a>', $match[0]);
   }
   
   return $match[0];
